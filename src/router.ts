@@ -489,6 +489,23 @@ export class Router {
   /** Parses a string into a {@link UrlTree} */
   parseUrl(url: string): UrlTree { return this.urlSerializer.parse(url); }
 
+  /** Converts given Url to RouterStateSnapshot */
+  urlToRouteStateSnapshot(url: string | UrlTree) : Promise<RouterStateSnapshot> {
+    const urlTree = url instanceof UrlTree ? url : this.parseUrl(url);
+    const mergedTree = this.urlHandlingStrategy.merge(urlTree, this.rawUrlTree);
+    const moduleInjector = this.ngModule.injector;
+    const redirectsApplied$ = applyRedirects(moduleInjector, this.configLoader, this.urlSerializer, urlTree, this.config);
+    const snapshot$ : Observable<RouterStateSnapshot> = mergeMap.call(redirectsApplied$, (appliedUrl: UrlTree) => {
+      return map.call(
+          recognize(
+              this.rootComponentType, this.config, appliedUrl, this.serializeUrl(appliedUrl)),
+          (snapshot: any) => {
+            return snapshot;
+          });
+    });
+    return snapshot$.toPromise();
+  }
+
   /** Returns whether the url is activated */
   isActive(url: string|UrlTree, exact: boolean): boolean {
     if (url instanceof UrlTree) {
